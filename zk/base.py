@@ -1574,6 +1574,43 @@ class ZK(object):
         if self.verbose: print ("_read w/chunk %i bytes" % start)
         return b''.join(data), start
 
+    def get_attendance_no_read_sizes(self):
+        """
+        Notice: This function was made specifically for AK3750WIFI_TFT platform.
+        Due to an error with read_sizes() and a specific attendance record size (= 22)
+        This function handles only that specific record size.
+
+        return attendance record
+
+        :return: List of Attendance object
+        """
+        attendances = []
+        attendance_data, size = self.read_with_buffer(const.CMD_ATTLOG_RRQ)
+        if size < 4:
+            if self.verbose: print ("WRN: no attendance data")
+            return []
+
+        record_size = 22 #AK3750WIFI_TFT platform record size
+        att_count = safe_cast(size/record_size, int)
+        #Skip size
+        i = 4
+        for idx in range(att_count):
+            #UID
+            uid = struct.unpack('<H', attendance_data[i:i+2])[0]
+            #user id
+            user_id = attendance_data[i+2:i+11].decode('ascii', errors='ignore').replace('\x00', '')
+            #Verify type
+            ver_type = attendance_data[i+12]
+            #timestamp
+            att_time = self.__decode_time(attendance_data[i+13 :i+17])
+            #Verify state
+            ver_state = attendance_data[i+18]
+            att = Attendance(user_id, att_time, ver_state, ver_type, uid)
+            attendances.append(att)
+            i += record_size
+        
+        return attendances
+    
     def get_attendance(self):
         """
         return attendance record
